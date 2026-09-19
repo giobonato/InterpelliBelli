@@ -1,0 +1,39 @@
+name: Monitor interpelli Vicenza
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # ogni 10 minuti (GitHub può ritardare di qualche minuto)
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: monitor
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installa pdftotext
+        run: sudo apt-get install -y --no-install-recommends poppler-utils >/dev/null
+
+      - name: Controlla la pagina
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          WATCH_CDC: ${{ vars.WATCH_CDC }}
+        run: python3 monitor.py
+
+      - name: Salva lo stato
+        run: |
+          if [ -n "$(git status --porcelain seen.json)" ]; then
+            git config user.name "interpelli-bot"
+            git config user.email "interpelli-bot@users.noreply.github.com"
+            git add seen.json
+            git commit -m "Aggiorna link visti"
+            git push
+          fi
